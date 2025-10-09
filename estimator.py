@@ -51,11 +51,13 @@ def fit_regression(
         )
     else:
         raise ValueError("method must be one of: 'ols', 'lad', 'huber'")
-
+    
     model.fit(X, y)
-    return {
-        "coef": pd.Series(model.coef_, index=feature_names),
-        "intercept": float(getattr(model, "intercept_", 0.0)),
-        "model": model,
-        "method": m,
-    }
+
+    intercept = float(getattr(model, "intercept_", 0.0))
+    coef = np.asarray(model.coef_, dtype=float).ravel()
+
+    # concatenate to one (p+1)-dimensional vector
+    beta = np.concatenate(([intercept], coef))
+
+    return beta
