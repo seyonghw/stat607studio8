@@ -7,14 +7,16 @@ from dgp import generate_design_matrix, generate_coefficients, generate_response
 from estimator import fit_regression
 from evaluate import evaluate
 
-def analyze_data(parameters):
+def analyze_data(n_sim, parameters):
     """
     Analyze the generated data using different regression methods and evaluate their performance.
 
     Parameters
     ----------
+    n_sim: int
+        Number of simulations to run.
     parameters : dict
-        A dictionary containing parameters for data generation and analysis.
+        A dictionary containing parameters for data generation.
 
     Returns
     -------
@@ -30,27 +32,37 @@ def analyze_data(parameters):
     distribution = parameters.get('distribution', 'normal')
     df_t = parameters.get('df_t', 1)
 
-    # Generate data
-    data, beta0, beta = generate_data(n, aspect_ratio, correlation_structure, rho, seed, snr, distribution, df_t)
+    ols_estimates = []
+    huber_estimates = []
+    lad_estimates = []
+    coefficients = []
+    for sim in range(n_sim):
+        np.random.seed(seed + sim)
+
+        # Generate data
+        data, beta0, beta = generate_data(n, aspect_ratio, correlation_structure, rho, seed, snr, distribution, df_t)
     
-    # Fit different regression models
-    methods = {
-        'OLS': LinearRegression(),
-        'Huber': HuberRegressor(),
-        'Quantile_0.5': QuantileRegressor(quantile=0.5)
-    }
+        # Fit models
+        ols_estimates.append(fit_regression(data, method='ols'))
+        huber_estimates.append(fit_regression(data, method='huber'))
+        lad_estimates.append(fit_regression(data, method='lad'))
 
-    ols_estimates = fit_regression(data, method='ols')
-    huber_estimates = fit_regression(data, method='huber')
-    lad_estimates = fit_regression(data, method='lad')
+        coefficients.append(np.concatenate((beta0, beta)))
+    
 
-    results = [evaluate(ols_estimates, [beta0, beta]),
-               evaluate(huber_estimates, [beta0, beta]),
-               evaluate(lad_estimates, [beta0, beta])]
+    coefficients = np.array(coefficients)
+    ols_estimates = np.array(ols_estimates)
+    huber_estimates = np.array(huber_estimates)
+    lad_estimates = np.array(lad_estimates)
 
-    return np.ndarray(results)
+    ols_results = evaluate(coefficients, ols_estimates)
+    huber_results = evaluate(coefficients, huber_estimates)
+    lad_results = evaluate(coefficients, lad_estimates)
+    results = [ols_results, huber_results, lad_results]
 
-def simulation_scenarios(distributions, df_ts, correlation_structures, snrs, aspect_ratios):
+    return results
+
+def simulation_scenarios(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_ratios):
     """
     Generate a list of simulation scenarios based on combinations of parameters.
     """
@@ -61,7 +73,9 @@ def simulation_scenarios(distributions, df_ts, correlation_structures, snrs, asp
                 for snr in snrs:
                     for aspect_ratio in aspect_ratios:
                         scenario = {
+                            "number iterations": n_sim,
                             "distribution": distribution,
+                            "df_t": None,
                             "correlation_structure": correlation_structure,
                             "snr": snr,
                             "aspect_ratio": aspect_ratio
@@ -73,6 +87,7 @@ def simulation_scenarios(distributions, df_ts, correlation_structures, snrs, asp
                     for snr in snrs:
                         for aspect_ratio in aspect_ratios:
                             scenario = {
+                                "number iterations": n_sim,
                                 "distribution": distribution,
                                 "df_t": df_t,
                                 "correlation_structure": correlation_structure,
@@ -83,12 +98,12 @@ def simulation_scenarios(distributions, df_ts, correlation_structures, snrs, asp
     return scenarios
 
 
-def simulate(distributions, df_ts, correlation_structures, snrs, aspect_ratios, n=100, seed=1):
-    scenarios = simulation_scenarios(distributions, df_ts, correlation_structures, snrs, aspect_ratios)
+def simulate(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_ratios, n=100, seed=1):
+    scenarios = simulation_scenarios(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_ratios)
     simulation_results = []
     for i, scenario in enumerate(scenarios):
         scenario_seed = seed + i
-        results = analyze_data({
+        results = analyze_data(scenario["number iterations"], {
             "n": n,
             "aspect_ratio": scenario["aspect_ratio"],
             "correlation_structure": scenario["correlation_structure"],
@@ -98,14 +113,15 @@ def simulate(distributions, df_ts, correlation_structures, snrs, aspect_ratios, 
             "distribution": scenario["distribution"],
             "df_t": scenario.get("df_t", None)
         })
-    simulation_results.append(scenario, results)
+    simulation_results.append([scenario, results])
     return simulation_results
 
-def run_all()
+def run_all():
+    n_sim = 100
     distributions = ["normal", "t"]
     df_ts = [1, 2, 3, 20]
     correlation_structures = ["identity", "autoregressive"]
     snrs = [1, 5, 10]
-    aspect_ratios = [0.5, 1, 2]
-    all_results = simulate(distributions, df_ts, correlation_structures, snrs, aspect_ratios, n=100, seed=1)
+    aspect_ratios = [0.2, 0.5, 8]
+    all_results = simulate(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_ratios, n=100, seed=1)
     return all_results
