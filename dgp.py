@@ -48,7 +48,7 @@ def generate_coefficients(p, seed=1):
         Number of features.
     """
     np.random.seed(seed)
-    ints = range(-2*p, 2*p)
+    ints = range(-3, 3)
     beta0 = np.random.choice(ints, 1)
     beta = np.random.choice(ints, p, replace=True)
     return beta0, beta
