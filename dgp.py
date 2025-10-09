@@ -119,4 +119,4 @@ def generate_data(n, aspect_ratio, correlation_structure="identity", rho=0.5, se
     beta0, beta = generate_coefficients(p, seed)
     y = generate_response(X, beta0, beta, seed, snr, distribution, df_t)
     data = pd.concat([y, X], axis=1)
-    return data 
+    return data, beta0, beta
