@@ -1,0 +1,8 @@
+# Python bytecode caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# (optional but handy)
+.ipynb_checkpoints/
+.pytest_cache/
