@@ -76,7 +76,7 @@ def generate_response(X, beta0, beta, seed=1, snr=1, distribution="normal", df=1
     p = X.shape[1]
     sigma = np.sqrt(np.transpose(beta)@X.T@X@beta / (snr))
     if distribution == "t":
-        errors = scipy.stats.t.rvs(df=df, size=n) * sigma
+        errors = scipy.stats.t.rvs(df=df, size=n) * sigma / np.sqrt(df/(df-2))
     elif distribution == "normal":
         errors = np.random.normal(0, sigma, n)
     else:

@@ -40,7 +40,7 @@ def analyze_data(n_sim, parameters):
         np.random.seed(seed + sim)
 
         # Generate data
-        data, beta0, beta = generate_data(n, aspect_ratio, correlation_structure, rho, seed, snr, distribution, df_t)
+        data, beta0, beta = generate_data(n, aspect_ratio, correlation_structure, rho, seed+sim, snr, distribution, df_t)
     
         # Fit models
         ols_estimates.append(fit_regression(data, method='ols'))
@@ -113,15 +113,15 @@ def simulate(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_r
             "distribution": scenario["distribution"],
             "df_t": scenario.get("df_t", None)
         })
-    simulation_results.append([scenario, results])
+        simulation_results.append([scenario, results])
     return simulation_results
 
 def run_all():
     n_sim = 100
     distributions = ["normal", "t"]
-    df_ts = [1, 2, 3, 20]
+    df_ts = [3, 5, 10, 20]
     correlation_structures = ["identity", "autoregressive"]
     snrs = [1, 5, 10]
-    aspect_ratios = [0.2, 0.5, 8]
+    aspect_ratios = [0.2, 0.5, 0.8]
     all_results = simulate(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_ratios, n=100, seed=1)
     return all_results
