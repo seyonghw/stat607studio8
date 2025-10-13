@@ -98,9 +98,53 @@ def simulation_scenarios(n_sim, distributions, df_ts, correlation_structures, sn
     return scenarios
 
 
+# def simulate(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_ratios, n=100, seed=1):
+#     scenarios = simulation_scenarios(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_ratios)
+#     simulation_results = []
+#     for i, scenario in enumerate(scenarios):
+#         scenario_seed = seed + i
+#         results = analyze_data(scenario["number iterations"], {
+#             "n": n,
+#             "aspect_ratio": scenario["aspect_ratio"],
+#             "correlation_structure": scenario["correlation_structure"],
+#             "rho": 0.5,
+#             "seed": scenario_seed,
+#             "snr": scenario["snr"],
+#             "distribution": scenario["distribution"],
+#             "df_t": scenario.get("df_t", None)
+#         })
+#         simulation_results.append([scenario, results])
+#     return simulation_results
+
+import pandas as pd
+import numpy as np
+
 def simulate(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_ratios, n=100, seed=1):
+    """
+    Run Monte Carlo simulations across scenarios and return results as a DataFrame.
+
+    Parameters
+    ----------
+    n_sim : int
+        Number of simulations per scenario.
+    distributions, df_ts, correlation_structures, snrs, aspect_ratios : list
+        Lists of parameter values to iterate over.
+    n : int
+        Sample size.
+    seed : int
+        Base random seed.
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame summarizing results with columns:
+        ['model', 'distribution', 'df_t', 'correlation_structure', 'snr',
+         'aspect_ratio', 'n_sim', 'MSE', 'MCSE']
+    """
     scenarios = simulation_scenarios(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_ratios)
-    simulation_results = []
+    rows = []
+    model_names = ["OLS", "Huber", "LAD"]
+
     for i, scenario in enumerate(scenarios):
         scenario_seed = seed + i
         results = analyze_data(scenario["number iterations"], {
@@ -113,8 +157,23 @@ def simulate(n_sim, distributions, df_ts, correlation_structures, snrs, aspect_r
             "distribution": scenario["distribution"],
             "df_t": scenario.get("df_t", None)
         })
-        simulation_results.append([scenario, results])
-    return simulation_results
+
+        # results = [(mse, mcse), (mse, mcse), (mse, mcse)]
+        for model_name, (mse, mcse) in zip(model_names, results):
+            rows.append({
+                "model": model_name,
+                "distribution": scenario["distribution"],
+                "df_t": scenario.get("df_t", None),
+                "correlation_structure": scenario["correlation_structure"],
+                "snr": scenario["snr"],
+                "aspect_ratio": scenario["aspect_ratio"],
+                "n_sim": scenario["number iterations"],
+                "MSE": mse,
+                "MCSE": mcse,
+            })
+
+    df = pd.DataFrame(rows)
+    return df
 
 def run_all():
     n_sim = 100
