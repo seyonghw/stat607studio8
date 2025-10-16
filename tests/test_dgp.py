@@ -20,3 +20,15 @@ def test_generate_design_matrix_shape_and_basic_stats():
     assert np.max(np.abs(col_means)) < thr
 
     assert np.all(np.abs(col_vars - 1.0) < thr)
+
+
+def test_generate_beta_shape_and_basic_stats():
+    p, r2 = 50, 5.0
+    beta = generate_beta(p, r2=r2)
+    assert beta.shape == (p,)
+    # all entries equal and positive
+    assert np.allclose(beta, beta[0])
+    # L2-norm should be sqrt(r2)
+    assert np.isclose(np.linalg.norm(beta), np.sqrt(r2), rtol=1e-12, atol=1e-12)
+    # per-entry value
+    assert np.isclose(beta[0], np.sqrt(r2 / p), rtol=1e-12, atol=1e-12)
