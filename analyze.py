@@ -3,7 +3,7 @@ import numpy as np
 import scipy
 from sklearn.linear_model import LinearRegression, HuberRegressor, QuantileRegressor
 
-from dgp import generate_design_matrix, generate_coefficients, generate_response, generate_data
+from dgp import generate_data
 from estimator import fit_regression
 from evaluate import evaluate
 
@@ -38,7 +38,7 @@ def analyze_data(n_sim, parameters):
         np.random.seed(seed + sim)
 
         # Generate data
-        data, beta0, beta = generate_data(n, aspect_ratio, correlation_structure, rho, seed+sim, snr, distribution, df_t)
+        data, beta0, beta = generate_data(n, aspect_ratio, snr, sigma2=1, seed=(seed+sim))
     
         # Fit models
         ols_estimates.append(fit_regression(data, method='ols'))
@@ -68,7 +68,7 @@ def simulation_scenarios(n_sim, distribution, correlation_structure, snr):
             aspect_ratios = [0.2, 0.5, 0.8, 2, 5]
         for ar in aspect_ratios:
             scenario = {
-                "number iterations": n_sim,
+                "number iterations": n,
                 "distribution": distribution,
                 "correlation_structure": correlation_structure,
                 "snr": snr,
