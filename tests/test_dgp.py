@@ -32,3 +32,10 @@ def test_generate_beta_shape_and_basic_stats():
     assert np.isclose(np.linalg.norm(beta), np.sqrt(r2), rtol=1e-12, atol=1e-12)
     # per-entry value
     assert np.isclose(beta[0], np.sqrt(r2 / p), rtol=1e-12, atol=1e-12)
+
+
+def test_generate_beta_invalid():
+    with pytest.raises(ValueError):
+        generate_beta(0, r2=1.0)
+    with pytest.raises(ValueError):
+        generate_beta(5, r2=-1.0)
