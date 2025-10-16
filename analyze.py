@@ -38,12 +38,12 @@ def analyze_data(n_sim, parameters):
         np.random.seed(seed + sim)
 
         # Generate data
-        data, beta0, beta = generate_data(n, aspect_ratio, snr, sigma2=1, seed=(seed+sim))
+        data, beta = generate_data(n, aspect_ratio, snr, sigma2=1, seed=(seed+sim))
     
         # Fit models
         ols_estimates.append(fit_regression(data, method='ols'))
 
-        coefficients.append(np.concatenate((beta0, beta)))
+        coefficients.append(beta)
     
 
     coefficients = np.array(coefficients)
@@ -61,9 +61,9 @@ def simulation_scenarios(n_sim, distribution, correlation_structure, snr):
     scenarios = []
     for n in n_sim:
         if n == 1:
-            aspect_ratios = np.logspace(0.1, 10, 5000)
-        elif n==50:
-            aspect_ratios = np.logspace(0.1, 10, 50)
+            aspect_ratios = np.logspace(-1, 1, 5000)
+        elif n == 50:
+            aspect_ratios = np.logspace(-1, 1, 100)
         else:
             aspect_ratios = [0.2, 0.5, 0.8, 2, 5]
         for ar in aspect_ratios:
@@ -74,7 +74,7 @@ def simulation_scenarios(n_sim, distribution, correlation_structure, snr):
                 "snr": snr,
                 "aspect_ratio": ar
             }
-        scenarios.append(scenario)
+            scenarios.append(scenario)
     return scenarios
 
 
@@ -136,8 +136,8 @@ def simulate(n_sim, distributions, correlation_structures, snrs, n=100, seed=1):
         })
 
         # results = [(mse, mcse), (mse, mcse), (mse, mcse)]
-        for model_name, (mse, mcse) in zip(model_names, results):
-            rows.append({
+        mse, mcse = results
+        rows.append({
                 "n_sim": scenario["number iterations"],
                 "aspect_ratio": scenario["aspect_ratio"],
                 "MSE": mse,
