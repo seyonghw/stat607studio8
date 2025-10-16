@@ -1,121 +1,63 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import scipy
 
-
-def generate_design_matrix(n, aspect_ratio, correlation_structure="identity", rho=0.5, seed=1):
+def generate_design_matrix(n, p, rng=None):
     """
-    Generate a sample design matrix for demonstration purposes.
-
-    Parameters
-    ----------
-    n : int
-        Number of samples.
-    aspect_ratio : int
-        Ratio of features to samples.
-    correlation_structure : str, optional
-        Type of correlation structure. Default is "identity".
-    rho : float, optional
-        Correlation coefficient for autoregressive structure. Default is 0.5.
-    seed : int, optional
-        Random seed for reproducibility. Default is 1.
-
-    Returns
-    -------
-    pd.DataFrame
-        A DataFrame representing the design matrix with n samples and p features.
+    X in R^{n x p} with iid N(0,1) entries.
     """
-    np.random.seed(seed)
+    rng = np.random.default_rng(rng)
+    X = rng.normal(loc=0.0, scale=1.0, size=(n, p))
+    return pd.DataFrame(X, columns=[f"X{j+1}" for j in range(p)])
 
-    p = int(aspect_ratio * n)
-    if(correlation_structure == "identity"):
-        X = np.random.normal(0, 1, (n, p))
-    elif(correlation_structure == "autoregressive"):
-        cov = rho ** np.abs(np.subtract.outer(np.arange(p), np.arange(p)))
-        X = np.random.multivariate_normal(np.zeros(p), cov, size=n)
-    else:
-        raise ValueError("Unsupported correlation structure")
-
-    return pd.DataFrame(X, columns=[f'X{i+1}' for i in range(p)])
-
-def generate_coefficients(p, seed=1):
+def generate_beta(p, r2=5):
     """
-    Generate a coefficient vector for the linear model.
-
-    Parameters
-    ----------
-    p : int
-        Number of features.
+    Beta = sqrt(r^2 / p) * 1_p (no intercept).
     """
-    np.random.seed(seed)
-    beta0 = np.random.sample(1)*2-1
-    beta = np.random.sample(p)*2-1
-    return beta0, beta
+    if p <= 0:
+        raise ValueError("p must be positive.")
+    if r2 < 0:
+        raise ValueError("r2 must be nonnegative.")
+    return np.full(p, np.sqrt(r2 / p), dtype=float)
 
-def generate_response(X, beta0, beta, seed=1, snr=1, distribution="normal", df=1):
+def generate_response(X, beta, sigma2=1, rng=None) -> pd.Series:
     """
-    Generate a response variable based on the design matrix and coefficients.
-
-    Parameters
-    ----------
-    X : pd.DataFrame
-        Design matrix.
-    beta0 : float
-        Intercept term.
-    beta : np.ndarray
-        Coefficient vector of length p.
-    seed : int, optional
-        Random seed for reproducibility. Default is 1.
-    snr : float, optional
-        Signal-to-noise ratio. Default is 1.
-    distribution : str, optional
-        Type of error distribution ("normal" or "t"). Default is "normal".
+    y = X beta + sigma * eps,  eps ~ N(0, I_n); no intercept term.
     """
-    np.random.seed(seed)
+    rng = np.random.default_rng(rng)
     n = X.shape[0]
-    p = X.shape[1]
-    sigma = np.sqrt(np.transpose(beta)@X.T@X@beta / (snr))
-    if distribution == "t":
-        errors = scipy.stats.t.rvs(df=df, size=n) * sigma / np.sqrt(df/(df-2))
-    elif distribution == "normal":
-        errors = np.random.normal(0, sigma, n)
-    else:
-        raise ValueError("Unsupported distribution type")
-    
-    y = beta0 + X.values @ beta + errors
-    return pd.Series(y, name='y')
+    if sigma2 < 0:
+        raise ValueError("sigma2 must be nonnegative.")
+    sigma = float(np.sqrt(sigma2))
+    eps = rng.normal(loc=0.0, scale=1.0, size=n)
+    y = X.to_numpy() @ beta + sigma * eps
+    return pd.Series(y, name="y")
 
-def generate_data(n, aspect_ratio, correlation_structure="identity", rho=0.5, seed=1, snr=1, distribution="normal", df_t=1):
+def generate_data(n=200, gamma=1, r2=5, sigma2=1.0, seed= 1):
     """
-    Generate a complete dataset including design matrix and response variable.
-
-    Parameters
-    ----------
-    n : int
-        Number of samples.
-    aspect_ratio : int
-        Ratio of features to samples.
-    correlation_structure : str, optional
-        Type of correlation structure. Default is "identity".
-    rho : float, optional
-        Correlation coefficient for autoregressive structure. Default is 0.5.
-    seed : int, optional
-        Random seed for reproducibility. Default is 1.
-    snr : float, optional
-        Signal-to-noise ratio. Default is 1.
-    distribution : str, optional
-        Type of error distribution ("normal" or "t"). Default is "normal".
-    df_t : int, optional
-        Degrees of freedom for t-distribution if used. Default is 1.
+    Experimental setup (no intercept) for benign overfitting:
+      - p = floor(gamma * n)
+      - X_ij ~ N(0,1), eps_i ~ N(0,1)
+      - beta = sqrt(r^2 / p) * 1_p
+      - y = X beta + sigma * eps, with sigma^2 = sigma2
 
     Returns
     -------
-    pd.DataFrame
-        A DataFrame containing the response variable and design matrix.
+    data : DataFrame with columns ['y', 'X1', ..., 'Xp']
+    beta : np.ndarray, shape (p,)
     """
-    X = generate_design_matrix(n, aspect_ratio, correlation_structure, rho, seed)
-    p = X.shape[1]
-    beta0, beta = generate_coefficients(p, seed)
-    y = generate_response(X, beta0, beta, seed, snr, distribution, df_t)
+    if n <= 0:
+        raise ValueError("n must be a positive integer.")
+    if gamma <= 0:
+        raise ValueError("gamma must be positive.")
+    p = int(np.floor(gamma * n))
+    if p < 1:
+        p = 1  
+
+    rng = np.random.default_rng(seed)
+    X = generate_design_matrix(n=n, p=p, rng=rng)
+    beta = generate_beta(p=p, r2=r2)
+    y = generate_response(X=X, beta=beta, sigma2=sigma2, rng=rng)
+
     data = pd.concat([y, X], axis=1)
-    return data, beta0, beta
+    return data, beta
