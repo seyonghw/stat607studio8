@@ -39,3 +39,16 @@ def test_generate_beta_invalid():
         generate_beta(0, r2=1.0)
     with pytest.raises(ValueError):
         generate_beta(5, r2=-1.0)
+
+
+def test_generate_response_dimensions_and_reproducibility():
+    n, p, seed = 120, 10, 999
+    X = generate_design_matrix(n, p, rng=seed)
+    beta = generate_beta(p, r2=4.0)  # ||beta||^2 = 4
+    y1 = generate_response(X, beta, sigma2=1.0, rng=seed)
+    y2 = generate_response(X, beta, sigma2=1.0, rng=seed)
+    assert isinstance(y1, pd.Series)
+    assert y1.shape == (n,)
+    assert y1.name == "y"
+    # reproducible for the same rng/seed
+    assert np.allclose(y1.to_numpy(), y2.to_numpy(), rtol=0, atol=0)
