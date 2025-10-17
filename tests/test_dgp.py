@@ -60,3 +60,33 @@ def test_generate_response_invalid_sigma2():
     beta = generate_beta(p, r2=1.0)
     with pytest.raises(ValueError):
         generate_response(X, beta, sigma2=-0.1, rng=0)
+
+
+def test_generate_data_shapes_gamma_and_reproducibility():
+    n, gamma, r2, sigma2, seed = 200, 1.3, 5.0, 1.0, 42
+    # p = floor(gamma * n)
+    p_expected = int(np.floor(gamma * n))
+    data1, beta1 = generate_data(n=n, gamma=gamma, r2=r2, sigma2=sigma2, seed=seed)
+    data2, beta2 = generate_data(n=n, gamma=gamma, r2=r2, sigma2=sigma2, seed=seed)
+    assert isinstance(data1, pd.DataFrame)
+    assert data1.shape == (n, p_expected + 1)  # y + p features
+    assert data1.columns[0] == "y"
+    assert beta1.shape == (p_expected,)
+    # reproducible
+    pd.testing.assert_frame_equal(data1, data2, check_exact=True)
+    assert np.allclose(beta1, beta2, rtol=0, atol=0)
+
+
+def test_generate_data_gamma_small_caps_at_one_feature():
+    n, gamma = 50, 1e-6
+    data, beta = generate_data(n=n, gamma=gamma, r2=2.0, sigma2=1.0, seed=7)
+    # floor(gamma*n) == 0 -> coerced to 1
+    assert data.shape[1] == 2   # y + X1
+    assert beta.shape == (1,)
+
+
+def test_generate_data_invalid_inputs():
+    with pytest.raises(ValueError):
+        generate_data(n=0, gamma=1.0, r2=1.0, sigma2=1.0, seed=1)
+    with pytest.raises(ValueError):
+        generate_data(n=10, gamma=0.0, r2=1.0, sigma2=1.0, seed=1)
