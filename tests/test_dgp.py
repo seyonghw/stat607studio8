@@ -52,3 +52,11 @@ def test_generate_response_dimensions_and_reproducibility():
     assert y1.name == "y"
     # reproducible for the same rng/seed
     assert np.allclose(y1.to_numpy(), y2.to_numpy(), rtol=0, atol=0)
+
+
+def test_generate_response_invalid_sigma2():
+    n, p = 30, 5
+    X = generate_design_matrix(n, p, rng=0)
+    beta = generate_beta(p, r2=1.0)
+    with pytest.raises(ValueError):
+        generate_response(X, beta, sigma2=-0.1, rng=0)
