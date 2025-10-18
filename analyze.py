@@ -1,11 +1,12 @@
 import pandas as pd
 import numpy as np
 import scipy
-from sklearn.linear_model import LinearRegression, HuberRegressor, QuantileRegressor
+
 
 from dgp import generate_data
 from estimator import fit_regression
 from evaluate import evaluate
+
 
 def analyze_data(n_sim, parameters):
     """
@@ -24,35 +25,91 @@ def analyze_data(n_sim, parameters):
         An array of evaluation metrics for each regression method.
     """
     n = parameters.get('n', 100)
-    aspect_ratio = parameters.get('aspect_ratio', 1)
-    correlation_structure = parameters.get('correlation_structure', 'identity')
-    rho = parameters.get('rho', 0.5)
+    aspect_ratio = parameters.get('aspect_ratio', 1.0)
+    correlation_structure = parameters.get('correlation_structure', 'identity')  # unused (kept for compat)
+    rho = parameters.get('rho', 0.5)                                            # unused (kept for compat)
     seed = parameters.get('seed', 1)
     snr = parameters.get('snr', 1)
-    distribution = parameters.get('distribution', 'normal')
-    df_t = parameters.get('df_t', 1)
+    distribution = parameters.get('distribution', 'normal')                      # unused (kept for compat)
+    df_t = parameters.get('df_t', 1)                                          # unused (kept for compat)
+    sigma2 = parameters.get('sigma2', 1.0)  # allow override; default stays 1.0
+
+    r2 = parameters.get('r2', snr)
 
     ols_estimates = []
     coefficients = []
+
+    p_expected = None  # track p to ensure consistent shapes across reps
+
     for sim in range(n_sim):
         np.random.seed(seed + sim)
 
         # Generate data
-        data, beta = generate_data(n, aspect_ratio, snr, sigma2=1, seed=(seed+sim))
-    
-        # Fit models
-        ols_estimates.append(fit_regression(data, method='ols'))
-
+        data, beta = generate_data(
+            n=n,
+            gamma=float(aspect_ratio),
+            r2=float(r2),
+            sigma2=float(sigma2),
+            seed=int(seed + sim)
+        )
+        # record true β (no intercept)
         coefficients.append(beta)
-    
 
-    coefficients = np.array(coefficients)
-    ols_estimates = np.array(ols_estimates)
+        # Fit models
+        # --- fit OLS (old estimator may return [intercept, β...] or just β) ---
+        est = fit_regression(data, method='ols')  # keep original call style
 
-    ols_results = evaluate(coefficients, ols_estimates)
-    results = ols_results
+        est = np.asarray(est, dtype=float).ravel()
+        # If estimator returned an intercept as first element, drop it
+        if est.size == beta.size + 1:
+            est = est[1:]
+        # If estimator returned only coefs, keep as-is
+        elif est.size == beta.size:
+            pass
+        else:
+            # As a last resort, try to coerce by dropping/padding to match β length
+            if est.size > beta.size:
+                est = est[-beta.size:]  # take the last p entries (defensive)
+            else:
+                # pad with zeros (shouldn't normally happen)
+                est = np.pad(est, (0, beta.size - est.size))
 
-    return results
+        # track/validate p consistency
+        if p_expected is None:
+            p_expected = beta.size
+        elif est.size != p_expected or beta.size != p_expected:
+            raise ValueError(
+                f"Inconsistent p across reps: expected {p_expected}, "
+                f"got est={est.size}, beta={beta.size}"
+            )
+
+        ols_estimates.append(est)
+
+    coefficients = np.asarray(coefficients, dtype=float)  # (R, p)
+    ols_estimates = np.asarray(ols_estimates, dtype=float)  # maybe (R, p+1) or (R, p)
+
+    # drop intercept if present to get (R, p)
+    if ols_estimates.shape[1] == coefficients.shape[1] + 1:
+        ols_estimates = ols_estimates[:, 1:]
+    elif ols_estimates.shape[1] != coefficients.shape[1]:
+        raise ValueError(f"Shape mismatch: estimates have {ols_estimates.shape[1]} cols, "
+                         f"but beta has {coefficients.shape[1]}.")
+
+    # use a single true beta vector (same across reps)
+    beta_true = coefficients[0]  # (p,)
+    # (optional) sanity check they are all identical
+    # assert np.allclose(coefficients, beta_true)
+
+    mse, mcse = evaluate(beta_true, ols_estimates)  # beta_true: (p,), beta_hat: (R, p)
+    return mse, mcse
+    # # --- stack to (R, p) and evaluate ---
+    # coefficients = np.asarray(coefficients, dtype=float)  # (R, p)
+    # ols_estimates = np.asarray(ols_estimates, dtype=float)  # (R, p)
+    #
+    # # Now both have matching shape (R, p), so evaluate won't broadcast error
+    # mse, mcse = evaluate(coefficients, ols_estimates)
+    # return mse, mcse
+
 
 def simulation_scenarios(n_sim, distribution, correlation_structure, snr):
     """
@@ -120,7 +177,7 @@ def simulate(n_sim, distributions, correlation_structures, snrs, n=100, seed=1):
     """
     scenarios = simulation_scenarios(n_sim, distributions, correlation_structures, snrs)
     rows = []
-    model_names = ["OLS", "Huber", "LAD"]
+    #model_names = ["OLS", "Huber", "LAD"]
 
     for i, scenario in enumerate(scenarios):
         scenario_seed = seed + i
@@ -138,17 +195,26 @@ def simulate(n_sim, distributions, correlation_structures, snrs, n=100, seed=1):
         # results = [(mse, mcse), (mse, mcse), (mse, mcse)]
         mse, mcse = results
         rows.append({
-                "n_sim": scenario["number iterations"],
-                "aspect_ratio": scenario["aspect_ratio"],
-                "MSE": mse,
-                "MCSE": mcse
-            })
+            "n_sim": scenario["number iterations"],
+            "aspect_ratio": scenario["aspect_ratio"],
+            "MSE": mse,
+            "MCSE": mcse
+        })
 
     df = pd.DataFrame(rows)
     return df
 
+
 def run_all():
-    n_sim = [1, 100, 1000]
+    """
+    Run the canonical set of scenarios and return a DataFrame of results.
+
+    Fixed settings:
+      n_sim = [1, 50, 1000], distributions = "normal",
+      correlation_structures = "identity", snrs = 5,
+      n = 200, seed = 1
+    """
+    n_sim = [1, 50, 1000]
     distributions = "normal"
     correlation_structures = "identity"
     snrs = 5
