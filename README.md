@@ -1,6 +1,6 @@
-STATS607 Studio7
+STATS607 Studio 7-8
 
-Names : Seyong Hwang, Ethan Schubert, Dongsun Yoon
+Names : Seyong Hwang, Ethan Schubert, Dongsun Yoon + Liza Kosina
 
 Running `main.ipnyb` outputs the plot.
 The plot is saved as `output.png`, and the whole pipeline runs by `run_all()` in `analyze.py`.
