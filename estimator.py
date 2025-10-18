@@ -15,7 +15,7 @@ def fit_regression(
     # Huber params
     huber_epsilon: float = 1.35,
     huber_alpha: float = 0.0,
-    huber_max_iter: int = 1000,
+    huber_max_iter: int = 5_000,
 ):
     """
     Fit OLS, LAD (median/quantile regression), or Huber on a DataFrame.
@@ -51,7 +51,7 @@ def fit_regression(
         )
     else:
         raise ValueError("method must be one of: 'ols', 'lad', 'huber'")
-    
+
     model.fit(X, y)
 
     intercept = float(getattr(model, "intercept_", 0.0))
